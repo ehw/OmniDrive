@@ -115,6 +115,9 @@
 .definethumblabel BlockToMsf,0x0C98FA
 .definethumblabel MSFtoLBA,0x0C995E
 .definethumblabel SledMove,0x0D8684
+.definethumblabel SledHome,0x0FB986
+.definethumblabel ServoRestart,0x0FA696
+.definethumblabel TrackingOpenStock,0x084850
 .definethumblabel SledServoSet,0x0E99F6
 .definethumblabel DpdEqualizer,0x0F7B30
 .definethumblabel TrackingOn,0x0F90E8
@@ -220,6 +223,7 @@ GdJumpMarginValue equ 106
 GdJumpRecoveriesValue equ 0
 GdProgramSeekMaxValue equ 3600
 GdTrackingBandHighValue equ 240
+GdSledHomeOnValue equ 1                              ; home after a bad reference: tested on a BH16NS58
 GdSpeedUpInnerValue equ 0x4F
 GdClvSpeedIndexValue equ 0x6
 

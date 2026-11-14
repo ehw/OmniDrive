@@ -151,6 +151,8 @@ DWORD GdSeekStep(DWORD r0, DWORD r1, DWORD r2, DWORD r3) {
 DWORD GdSeekRecover(DWORD status, DWORD r1, DWORD r2, DWORD r3) {
     DWORD caller = (DWORD)__builtin_return_address(0);
     // The first two read errors (3 or 0x18) of the seek: we return 0, and the stock seek runs its step again.
+    gd.home.recovers++;
+    gd.home.lastRecoverStatus = (BYTE)status;
     if (caller == (DWORD)seekRecoverReturn && (status == 3 || status == 0x18) && gd.limitWaits < 2) {
         // Before the first retry, with focus and the FG below 20, we wait up to 0.5 seconds for the spindle. Right
         // after a spin-up the data PLL cannot lock yet.
@@ -161,6 +163,7 @@ DWORD GdSeekRecover(DWORD status, DWORD r1, DWORD r2, DWORD r3) {
         }
         return 0;
     }
+    gd.home.stockRecovers++;
     return SeekRecover(status, r1, r2, r3);
 }
 
@@ -304,8 +307,10 @@ static DWORD GdSeekReference(void) {
     senseCode = 0;
     hdMinuteMap &= ~0x03;                               // LBA 9,000 lies in the single-density area
     Seek10Command();
-    if (senseCode)
+    if (senseCode) {
+        gd.home.refSense = senseCode;
         return 4;
+    }
     return playerStatus ? 1 : 0;
 }
 
@@ -343,6 +348,7 @@ static DWORD GdReferenceMeasure(SDWORD *ref) {
         if ((result = GdSeekReference()) != 0)
             return result;
         position = GdSledPosition();
+        gd.home.pos[(round - 1) & 3] = (SWORD)position;
         if (position - last <= GdReferenceTolerance && last - position <= GdReferenceTolerance) {
             *ref = position;
             return 0;
@@ -372,6 +378,10 @@ static DWORD GdReferenceMeasure(SDWORD *ref) {
  */
 static DWORD GdReferenceRead(SDWORD *ref) {
     DWORD result;
+    int i;
+    gd.home.refSense = 0;                               // the telemetry of this measure starts empty
+    for (i = 0; i < 4; i++)
+        gd.home.pos[i] = 0x7FFF;
     GdSeekLimitOn();
     mediaType |= gd.recordable;                         // the stock seek fails on a CD-R that shows as a CD-ROM
     // A program read with no focus on an active drive gets no measure: such a stock seek takes about 9 seconds, and
@@ -380,6 +390,7 @@ static DWORD GdReferenceRead(SDWORD *ref) {
         result = 1;
     else
         result = GdReferenceMeasure(ref);
+    gd.home.refResult = (BYTE)result;
     mediaType &= ~gd.recordable;
     GdSeekLimitOff();
     if (result == 0)
@@ -446,6 +457,47 @@ static DWORD GdReferenceChoose(SDWORD *out) {
 }
 
 /*
+ * Function Name:  GdSledHome
+ *
+ * Set the zero of the sled position again with the stock home, after a bad
+ * reference.
+ *
+ * The sled position (servo DSP word 0x300) counts the steps the servo gave the
+ * sled. It has no fixed zero: at power-up it is wherever the sled stood, and
+ * the stock code sets it again only in its home (SledHome), which it runs to
+ * recover from errors. After a power loss with the sled away from the place
+ * the stock code parks it, the position is offset. On a BH16NS58 running this
+ * firmware, a reference of -68 after such a power loss (83 is normal) failed
+ * every read of a disc, and a reference that could not be measured at all
+ * failed the same way. The stock seek of the reference also aims by position,
+ * so it misses as well. The home puts the zero back where the stock code and
+ * the drive file expect it.
+ *
+ * The steps are those of the stock seek recovery when it homes (0x8E936 in the
+ * ASUS firmware): tracking open, focus off, home, then the stock servo restart
+ * (focus search, tracking pull-in with the CD sled servo values, data PLL,
+ * spindle speed). GdServoClose is not enough here: it only closes the tracking
+ * loop and sets the sled servo values of the DVD table, and the stock seek of
+ * the next reference then failed every time.
+ *
+ * Preconditions:   gd.hdRead is 0: the stock code runs as stock.
+ *
+ * Parameters:  None.
+ *
+ * Returns:     Nothing.
+ */
+static void GdSledHome(void) {
+    gd.home.homes++;
+    gd.home.commandTime = gd.commandTime;
+    TrackingOpenStock();
+    FocusOff();
+    SledHome(0);
+    gd.home.posAfterHome = (SWORD)GdSledPosition();
+    gd.home.restart = (BYTE)ServoRestart();
+    gd.home.posAfterRestart = (SWORD)GdSledPosition();
+}
+
+/*
  * Function Name:  GdReference
  *
  * Get the reference position of this read.
@@ -479,6 +531,25 @@ static void GdReference(void) {
         gd.ref.value = (SWORD)ref;
         if (ref >= GdReferenceLow && ref <= GdReferenceHigh)
             gd.ref.failed = 0;
+    }
+#if GD_TEST_FORCE_HOME
+    if (!gd.home.homes)                                 // test builds: the first reference after power-up is bad
+        gd.ref.failed = 1;
+#endif
+    // A bad reference, or none: the zero of the sled position may be off. Home once a command, then measure again.
+    if (GdSledHomeOn && gd.ref.failed && gd.home.commandTime != gd.commandTime) {
+        gd.home.refBefore = gd.home.refResult == 0 ? gd.ref.value : 0x7FFF;
+        GdSledHome();
+        GdFitReset();                                   // the landings of the fit are in the old frame
+        gd.ref.time = RTC_COUNT;
+        gd.ref.checks = gd.check.count;
+        gd.home.refAfter = 0x7FFF;
+        if (GdReferenceRead(&ref) == 0) {
+            gd.ref.value = (SWORD)ref;
+            gd.home.refAfter = (SWORD)ref;
+            if (ref >= GdReferenceLow && ref <= GdReferenceHigh)
+                gd.ref.failed = 0;
+        }
     }
     for (i = 0; i < 12; i++)
         cdb[i] = savedCdb[i];
@@ -729,7 +800,9 @@ DWORD GdSeekTarget(void) {
     if (GdInProgramRead())
         GdFocusOn();                                    // a sled move with the focus off is often slow
     if (gd.ref.failed)
-        return GdServoRead(0x300);                      // no reference: the position now, so the sled does not move
+        // No reference: the position now, so the sled does not move. Signed: the unsigned halfword of a position
+        // below zero made SledMove drive the sled out to the end stop.
+        return (DWORD)GdSledPosition();
     if (gd.leadIn) {
         // A rule measured on the drive: reference + GdLeadInOffset is FAD GdLeadInLandingFad, and one position is
         // GdLeadInScale frames (567, 675,000 and 102 in the BU40N firmware).
@@ -992,7 +1065,7 @@ GD_SYMBOL int GdPositionCheck(void) {
         }
     }
     if (fad) {
-        SDWORD position = (SDWORD)GdServoRead(0x300);   // the unsigned halfword, as the servo DSP gives it
+        SDWORD position = GdSledPosition();             // signed: a position below zero must not read as 65,000
         SDWORD lens = GdLensShift();
         gd.check.fad = wait.lastQ;
         found = GdJumpToTarget();
