@@ -242,6 +242,7 @@ GdJumpMargin:           .d32 GdJumpMarginValue
 GdJumpRecoveries:       .d32 GdJumpRecoveriesValue
 GdProgramSeekMax:       .d32 GdProgramSeekMaxValue
 GdTrackingBandHigh:     .d32 GdTrackingBandHighValue
+GdSledHomeOn:           .d32 GdSledHomeOnValue
 UnsignedDivide:         .d32 StockUnsignedDivide
 .thumb
 .endarea

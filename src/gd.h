@@ -125,6 +125,10 @@ extern DWORD (* const UnsignedDivide)(DWORD number, DWORD divisor);
 #define GD_ZCAV_SPEED           12                      // the speed of a program read (12x)
 #define GD_RPM                  2000                    // the spindle of a lead-in read
 #define GD_SEEK_LIMIT           0x1A0                   // the sled limit of a stock seek: position 416
+// Test builds only: 1 makes the first reference after power-up count as bad, so that the home path runs once.
+#ifndef GD_TEST_FORCE_HOME
+#define GD_TEST_FORCE_HOME      0
+#endif
 
 // the numbers that differ from drive to drive: data words of the gd asm file, with the values of the drive file
 extern const SDWORD GdLeadInOffset;                     // the sled position of FAD GdLeadInLandingFad, above the reference
@@ -141,6 +145,7 @@ extern const SDWORD GdJumpMargin;                       // the jump target lies 
 extern const DWORD GdJumpRecoveries;                    // the most focus-ons and pull-ins after a jump with no pair of Q
 extern const DWORD GdProgramSeekMax;                    // the highest sled position of a program seek
 extern const DWORD GdTrackingBandHigh;                  // the highest sled band (position / 16) of a tracking pull-in
+extern const DWORD GdSledHomeOn;                        // 1: home after a bad reference (GdSledHome)
 
 enum {                                                  // why the cache hits ended (gd.hits.why)
     GD_END_IDLE = 1,                                    // no request for 1 second
@@ -227,6 +232,19 @@ struct GdZcav {                                         // ZCAV: the spindle spe
     DWORD nextStep, zoneEnd;                            // FADs
 };
 
+struct GdHome {                                         // the stock home after a bad reference (GdReference)
+    BYTE homes;                                         // the homes since power-up
+    BYTE refResult;                                     // the result of the last GdReferenceRead (0 good, 1, 2, 4)
+    BYTE recovers, stockRecovers;                       // GdSeekRecover calls; those passed on to the stock recovery
+    SWORD refBefore, refAfter;                          // the reference before and after the last home (0x7FFF: none)
+    SWORD pos[4];                                       // the sled positions of the last measure's rounds
+    DWORD refSense;                                     // senseCode left by the stock seek of the last measure
+    DWORD commandTime;                                  // gd.commandTime of the last home: one home a command
+    BYTE restart;                                       // the result of ServoRestart after the last home (0 good)
+    BYTE lastRecoverStatus;                             // the last status given to GdSeekRecover
+    SWORD posAfterHome, posAfterRestart;                // the sled position right after the home and the restart
+};
+
 struct GdLoop {                                         // the read loop: in GdRam, not on the stack, so that the stack
     DWORD passes, start, sent;                          //   under ReadCDDA stays small
 };
@@ -264,6 +282,7 @@ struct GdState {
     struct GdSpindle spindle;
     struct GdZcav zcav;
     struct GdLoop loop;
+    struct GdHome home;
 };
 #define gd (*(struct GdState *)GD_RAM_BASE)
 

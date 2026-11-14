@@ -115,6 +115,9 @@
 .definethumblabel BlockToMsf,0x0C9F46
 .definethumblabel MSFtoLBA,0x0C9FAA
 .definethumblabel SledMove,0x0D865A
+.definethumblabel SledHome,0x0FC4CC
+.definethumblabel ServoRestart,0x0FB374
+.definethumblabel TrackingOpenStock,0x083F86
 .definethumblabel SledServoSet,0x0EA0FA
 .definethumblabel DpdEqualizer,0x0F8822
 .definethumblabel TrackingOn,0x0F9D76
@@ -220,6 +223,7 @@ GdJumpMarginValue equ 66
 GdJumpRecoveriesValue equ 2
 GdProgramSeekMaxValue equ 4160
 GdTrackingBandHighValue equ 260
+GdSledHomeOnValue equ 0                              ; the BU40N home backs off 0x400, not 0xE49: untested
 GdSpeedUpInnerValue equ 0x4F
 GdClvSpeedIndexValue equ 0x6
 

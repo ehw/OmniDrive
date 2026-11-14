@@ -98,6 +98,13 @@ extern void ReadCDDA();
 extern DWORD BlockToMsf(DWORD block);
 extern DWORD MSFtoLBA(DWORD msf);
 extern void SledMove(DWORD position);
+// mode 0: the stock home. It drives the sled out against the end stop, back 3,657 counts (CD), and sets the sled
+// position (servo DSP word 0x300) to 0. The stock code runs it only to recover from errors.
+extern void SledHome(DWORD mode);
+// The stock servo restart that the stock seek recovery runs right after its home: focus search, tracking pull-in
+// (which also sets the CD sled servo), data PLL and spindle speed. 0: the servos run again.
+extern DWORD ServoRestart(void);
+extern void TrackingOpenStock(void);                    // the tracking loop open, as the stock recovery does first
 extern void SledServoSet(DWORD mode); 
 extern void DpdEqualizer(DWORD value);
 extern DWORD TrackingOn(void); 
