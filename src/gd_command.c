@@ -120,9 +120,9 @@ void GdReadDiscRaw(void) {
         ReturnSense(0x05, 0x24, 0x00);                  // INVALID FIELD IN CDB
         return;
     }
-    // A CD read of a GD disc, whose single-density area ends below GD_SD_LAST_SECTOR. A very short normal CD also
+    // A CD read of a GD disc, whose single-density area ends at GD_SD_LAST_SECTOR or lower. A short normal CD also
     // passes, but all of it lies inside the sled limit.
-    if ((cdb[1] & 0x03) == 0 && lastSector - 1 < GD_SD_LAST_SECTOR) {
+    if ((cdb[1] & 0x03) == 0 && lastSector - 1 <= GD_SD_LAST_SECTOR) {
         if (driveSpeedCap >= driveSpeed)                // above the cap, the stock code makes a speed step instead
             GdCalibrationOff();
         GdSeekLimitOn();

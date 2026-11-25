@@ -729,7 +729,7 @@ DWORD GdSeekTarget(void) {
     if (GdInProgramRead())
         GdFocusOn();                                    // a sled move with the focus off is often slow
     if (gd.ref.failed)
-        return GdServoRead(0x300);                      // no reference: the position now, so the sled does not move
+        return (DWORD)GdSledPosition();                 // no reference: the position now, so the sled does not move
     if (gd.leadIn) {
         // A rule measured on the drive: reference + GdLeadInOffset is FAD GdLeadInLandingFad, and one position is
         // GdLeadInScale frames (567, 675,000 and 102 in the BU40N firmware).
@@ -992,7 +992,7 @@ GD_SYMBOL int GdPositionCheck(void) {
         }
     }
     if (fad) {
-        SDWORD position = (SDWORD)GdServoRead(0x300);   // the unsigned halfword, as the servo DSP gives it
+        SDWORD position = GdSledPosition();
         SDWORD lens = GdLensShift();
         gd.check.fad = wait.lastQ;
         found = GdJumpToTarget();
