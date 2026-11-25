@@ -104,7 +104,7 @@ extern DWORD (* const UnsignedDivide)(DWORD number, DWORD divisor);
 #define GD_LBA_LEADIN_LAST      681524u                 // FAD 681,674
 #define GD_LBA_PROGRAM_FIRST    44850u                  // the pregap of track 3 (FAD 45,000)
 #define GD_LBA_PROGRAM_LAST     549299u                 // 150 sectors into the high-density lead-out
-#define GD_SD_LAST_SECTOR       13949u                  // a disc whose last single-density sector lies lower is a GD disc
+#define GD_SD_LAST_SECTOR       17849u                  // the last single-density sector of a GD disc (A-time 03:59:74)
 #define GD_RETRIES              9                       // the most attempts after the first
 #define GD_COMMAND_TICKS        10582000u               // 20 seconds: no attempt starts later
 #define GD_IDLE_TICKS           211600u                 // 400 ms: after a longer gap the reference is measured again
